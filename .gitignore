@@ -26,3 +26,6 @@ Thumbs.db
 
 # Local Gemini
 .gemini/tmp/
+
+# pdf file
+*.pdf
