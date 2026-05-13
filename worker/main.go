@@ -2,8 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -22,26 +21,32 @@ var (
 	)
 )
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 func main() {
-	// Configure standard logger
-	log.SetFlags(0)
+	// Configure slog for JSON output
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
 	env := os.Getenv("APP_ENV")
 	if env == "" {
 		env = "DEV"
 	}
 
-	startupLog, _ := json.Marshal(map[string]interface{}{
-		"level":   "info",
-		"message": "Starting Background Service Worker",
-		"env":     env,
-	})
-	fmt.Println(string(startupLog))
+	slog.Info("Starting Background Service Worker", "env", env)
 
-	// Expose metrics endpoint
+	// Expose metrics and health endpoints
 	go func() {
+		http.HandleFunc("/health", healthHandler)
 		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":9090", nil)
+		slog.Info("Starting metrics/health server on :9090")
+		if err := http.ListenAndServe(":9090", nil); err != nil {
+			slog.Error("Metrics server failed", "error", err)
+		}
 	}()
 
 	// Simulate periodic job
@@ -54,16 +59,12 @@ func main() {
 func performJob(env string) {
 	// Requirement: Update timestamp of today records
 	// Stub implementation
-	timestamp := time.Now().Format(time.RFC3339)
 	
 	// Update metric
 	workerLastSuccess.SetToCurrentTime()
 
-	jobLog, _ := json.Marshal(map[string]interface{}{
-		"level":   "info",
-		"message": "Worker job executed: Updated timestamps for today's records",
-		"time":    timestamp,
-		"env":     env,
-	})
-	fmt.Println(string(jobLog))
+	slog.Info("Worker job executed: Updated timestamps for today's records",
+		"env", env,
+		"time", time.Now().Format(time.RFC3339),
+	)
 }

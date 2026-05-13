@@ -2,78 +2,113 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Response structure for JSON logging and API output
+// Response structure for API output
 type HealthResponse struct {
 	Status    string `json:"status"`
 	Timestamp string `json:"timestamp"`
 	Env       string `json:"environment"`
 }
 
+var (
+	httpRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"path", "method", "code"},
+	)
+	httpRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "Duration of HTTP requests",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"path", "method"},
+	)
+)
+
+// responseWriter is a minimal wrapper for http.ResponseWriter that allows exposing the HTTP status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &responseWriter{w, http.StatusOK}
+
+		next.ServeHTTP(rw, r)
+
+		duration := time.Since(start).Seconds()
+		path := r.URL.Path
+		method := r.Method
+		code := strconv.Itoa(rw.statusCode)
+
+		httpRequestsTotal.WithLabelValues(path, method, code).Inc()
+		httpRequestDuration.WithLabelValues(path, method).Observe(duration)
+	})
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Get environment variable (DEV, UAT, PROD) default to DEV
 	env := os.Getenv("APP_ENV")
 	if env == "" {
 		env = "DEV"
 	}
 
-	// 2. Prepare the response data
 	res := HealthResponse{
 		Status:    "ok",
 		Timestamp: time.Now().Format(time.RFC3339),
 		Env:       env,
 	}
 
-	// 3. Set content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	// 4. Send the JSON response
 	json.NewEncoder(w).Encode(res)
 
-	// 5. Output structured JSON log (Requirement 5a)
-	logData, _ := json.Marshal(map[string]interface{}{
-		"level":   "info",
-		"message": "Health check accessed",
-		"path":    r.URL.Path,
-		"env":     env,
-		"time":    res.Timestamp,
-	})
-	fmt.Println(string(logData))
+	slog.Info("Health check accessed",
+		"path", r.URL.Path,
+		"env", env,
+		"time", res.Timestamp,
+	)
 }
 
 func main() {
-	// Configure standard logger to only print the message (we handle JSON formatting ourselves)
-	log.SetFlags(0)
+	// Configure slog for JSON output
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
-	http.HandleFunc("/health", healthHandler)
+	// Setup handlers with metrics middleware
+	http.Handle("/health", metricsMiddleware(http.HandlerFunc(healthHandler)))
+	http.Handle("/metrics", promhttp.Handler())
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	startupLog, _ := json.Marshal(map[string]interface{}{
-		"level":   "info",
-		"message": "Starting API Service",
-		"port":    port,
-	})
-	fmt.Println(string(startupLog))
+	slog.Info("Starting API Service", "port", port)
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		errorLog, _ := json.Marshal(map[string]interface{}{
-			"level":   "fatal",
-			"message": "Failed to start server",
-			"error":   err.Error(),
-		})
-		fmt.Println(string(errorLog))
+		slog.Error("Failed to start server", "error", err)
 		os.Exit(1)
 	}
 }

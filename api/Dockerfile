@@ -3,10 +3,9 @@ FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
-# Copy go.mod and download dependencies
-COPY go.mod ./
-# Note: go.sum is missing in the current directory, so we skip copying it for now
-# RUN go mod download
+# Copy go.mod and go.sum and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
 # Copy the rest of the source code
 COPY . .
