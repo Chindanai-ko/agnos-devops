@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         app: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9090"
     spec:
       containers:
       - name: worker
@@ -23,10 +27,25 @@ spec:
             configMapKeyRef:
               name: app-config
               key: APP_ENV
+        ports:
+        - containerPort: 9090
+          name: metrics
         resources:
           requests:
-            cpu: "50m"
-            memory: "64Mi"
-          limits:
             cpu: "100m"
             memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 10

@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: app-config
 data:
-  APP_ENV: "DEV" # Default to DEV, can be overridden per environment
+  APP_ENV: "DEV" # Default to DEV, can be overridden per environment like UAT or PROD
