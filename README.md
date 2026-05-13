@@ -29,9 +29,10 @@ This repository contains the implementation of a production-ready DevOps setup f
 ├── k8s/
 │   ├── api.yaml
 │   ├── worker.yaml
-│   ├── hpa.yaml
-│   ├── configmap.yaml
-│   └── alert-rules.yaml
+├── hpa.yaml
+├── configmap.yaml
+├── alert-rules.yaml
+└── prometheus.yaml
 └── .github/workflows/
     └── main.yml
 ```
@@ -59,6 +60,12 @@ Apply manifests:
 ```bash
 kubectl apply -f k8s/
 ```
+
+Access Prometheus:
+```bash
+kubectl port-forward svc/prometheus-service 9090:80
+```
+Open `http://localhost:9090` in your browser.
 
 ## Failure Scenario Handling
 
