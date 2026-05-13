@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+    - name: Lint API
+      run: cd api && go vet ./...
+    - name: Lint Worker
+      run: cd worker && go vet ./...
+    - name: Test API
+      run: cd api && go test -v ./...
+    - name: Test Worker
+      run: cd worker && go test -v ./...
+
+  build:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build API Image
+      run: docker build -t agnos-api:${{ github.sha }} ./api
+    - name: Build Worker Image
+      run: docker build -t agnos-worker:${{ github.sha }} ./worker
+    - name: Security Scan API (Optional)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'agnos-api:${{ github.sha }}'
+        format: 'table'
+        exit-code: '0' # Set to 0 to not fail the build for now
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy (Mocked)
+      run: |
+        echo "Deploying to Kubernetes..."
+        echo "Applying manifests from k8s/ directory"
+        # In a real scenario, we would use:
+        # kubectl apply -f k8s/
