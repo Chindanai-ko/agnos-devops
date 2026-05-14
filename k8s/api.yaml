@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: nomcko/agnos-api:v2
+        image: nomcko/agnos-api:v3
         env:
         - name: APP_ENV
           valueFrom:

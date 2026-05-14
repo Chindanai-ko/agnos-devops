@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: nomcko/agnos-worker:v2
+        image: nomcko/agnos-worker:v3
         env:
         - name: APP_ENV
           valueFrom:
