@@ -53,7 +53,8 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./api
-        push: false # Set to true and add login step if registry is available
+        push: false
+        load: true
         tags: |
           agnos-api:${{ github.sha }}
           agnos-api:latest
@@ -64,7 +65,8 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./worker
-        push: false # Set to true and add login step if registry is available
+        push: false
+        load: true
         tags: |
           agnos-worker:${{ github.sha }}
           agnos-worker:latest
@@ -75,6 +77,15 @@ jobs:
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: 'agnos-api:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+    - name: Security Scan Worker
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'agnos-worker:${{ github.sha }}'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
