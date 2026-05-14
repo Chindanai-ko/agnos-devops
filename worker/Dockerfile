@@ -16,15 +16,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o main ./main.go
 # Final stage
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 
-WORKDIR /root/
+WORKDIR /home/appuser/
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/main .
 
 # Expose port 9090 for metrics
 EXPOSE 9090
+
+USER appuser
 
 # Run the binary
 CMD ["./main"]
