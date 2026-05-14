@@ -25,14 +25,14 @@ This repository contains the implementation of a production-ready DevOps setup f
 ├── worker/
 │   ├── Dockerfile
 │   ├── main.go
+│   ├── main_test.go
 │   └── go.mod
 ├── k8s/
 │   ├── api.yaml
 │   ├── worker.yaml
-├── hpa.yaml
-├── configmap.yaml
-├── alert-rules.yaml
-└── prometheus.yaml
+│   ├── hpa.yaml
+│   ├── configmap.yaml
+│   └── prometheus.yaml
 └── .github/workflows/
     └── main.yml
 ```
@@ -56,16 +56,24 @@ docker-compose up --build
 ```
 
 ### Kubernetes
-Apply manifests:
-```bash
-kubectl apply -f k8s/
-```
+1. **Enable Metrics Server** (Required for HPA):
+   On Docker Desktop or Minikube, you may need to install the metrics server:
+   ```bash
+   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+   # If using Docker Desktop, patch for insecure TLS:
+   kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+   ```
 
-Access Prometheus:
-```bash
-kubectl port-forward svc/prometheus-service 9090:80
-```
-Open `http://localhost:9090` in your browser.
+2. **Apply manifests**:
+   ```bash
+   kubectl apply -f k8s/
+   ```
+
+3. **Access Prometheus**:
+   ```bash
+   kubectl port-forward svc/prometheus-service 9090:9090
+   ```
+   Open `http://localhost:9090` in your browser. (Alternatively, use the NodePort: `http://localhost:30090`)
 
 ## Failure Scenario Handling
 
